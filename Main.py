@@ -3,8 +3,11 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import string
 import time
+import matplotlib.pyplot as plt
 
 letters = string.ascii_lowercase
+MathsExt1 = {2015: "Mathematics Extension 1", 2001: "Mathematics Extension 1 2 unit "}
+MathsExt2 = {2015: "Mathematics Extension 2", 2001: "Mathematics Extension 2 2 unit "}
 
 def fileExists(path: str)->bool:
     try:
@@ -63,7 +66,7 @@ def getDataFrame(year: int) -> pd.DataFrame:
     t0 = time.time()
     path = str(year) + ".csv"
     if(fileExists(path)):
-        df = pd.read_csv(str(year) + ".csv")
+        df = pd.read_csv(str(year) + ".csv", index_col=[0]).reset_index().drop(["index"], axis=1)
         return df
     urls = []
     if 2018<=year and year<=2022:
@@ -83,7 +86,6 @@ def getDataFrame(year: int) -> pd.DataFrame:
         if response.status_code==200:
             html_doc = response.text
         else:
-            print(url)
             raise TimeoutError("Web Page doesn't exist")
 
         #Parsing all the tr elements from the site
@@ -130,18 +132,89 @@ def getDataFrame(year: int) -> pd.DataFrame:
                         print(name + " " + school + " " + subjects[i])
                     i+=1
         print(url + " appended")
-        df = pd.DataFrame(rows, columns=["Name", "School", "Subject"])
+        df = pd.DataFrame(rows, columns=[str(year) + " Name", str(year) + " School", str(year) + " Subject"])
         dfs.append(df)
-    maindf = pd.concat(dfs, axis=0)
+    print("Not read from machine")
+    maindf = pd.concat(dfs, axis=0).reset_index().drop(["index"], axis=1)
     maindf.to_csv(str(year) + ".csv")
     print("getDataFrame execution time: " + str(time.time()-t0))
     return maindf
 
 def generateCSVs():
+    for year in getYears():
+        getDataFrame(year)
+    
+def getList(year: int, item="School"):
+    df = getDataFrame(year)
+    main = []
+    for focus in df[str(year) + " " + item]:
+        if focus not in main:
+            main.append(focus)
+    return main
+
+def getYears():
+    years = []
     year = 2001
     while year<=2022:
-        getDataFrame(year)
+        years.append(year)
         year+=1
+    return years
 
-generateCSVs()
+def getSchoolYearSubjectCount(year: int, school: str, subject: str):
+    df = getDataFrame(year)
+    subjectList = getList(year, item="Subject")
 
+    if subject in subjectList:
+        pass
+    else:
+        for element in subjectList:
+            if element.startswith(subject):
+                subject = element
+    print(str(year) + ": " + subject)
+    count =0
+    i = 0
+    while i<len(df[str(year) + " School"]):
+        if df[str(year) + " School"][i].startswith(school):
+            properSchool = df[str(year) + " School"][i]
+            if df[str(year) + " Subject"][i]==subject:
+                count+=1
+        i+=1
+    return (count, properSchool, subject)
+
+def getSchoolRecordSubject(school: str, subject: str):
+    scores = []
+    for year in getYears():
+        score, properSchool, properSubject = getSchoolYearSubjectCount(year, school, subject)
+        scores.append(score)
+    return scores, properSchool, properSubject
+
+def graphMultiple():
+    school = ""
+    schools = []
+    subjects = []
+
+    years = getYears()
+
+    while school.lower()!="graph":
+        school = input("School: ")
+        if school=="graph":
+            continue
+        schools.append(school)
+
+        subject = input("Subject: ")
+        subjects.append(subject)
+
+        print("\n")
+    
+    fig, ax = plt.subplots(len(schools), 1)
+    for i in range(len(schools)):
+        scores, properSchool, subject = getSchoolRecordSubject(schools[i], subjects[i])
+        
+        ax[i].plot(years, scores)
+        ax[i].set_xlabel("Years")
+        ax[i].set_ylabel("Band 6 count")
+        ax[i].set_title(properSchool + " band 6 count for " + subject)
+    
+    plt.show()
+
+graphMultiple()
