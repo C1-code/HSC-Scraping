@@ -6,6 +6,13 @@ import time
 
 letters = string.ascii_lowercase
 
+def fileExists(path: str)->bool:
+    try:
+        f = open(path, "r")
+        return True
+    except FileNotFoundError:
+        return False
+
 def getLinks(year: int):
     url = "https://www.boardofstudies.nsw.edu.au/ebos/static/DSACH_" + str(year) + "_12.html"
     response = requests.get(url)
@@ -54,6 +61,10 @@ def getSubjectDictionary(year: int):
 
 def getDataFrame(year: int) -> pd.DataFrame:
     t0 = time.time()
+    path = str(year) + ".csv"
+    if(fileExists(path)):
+        df = pd.read_csv(str(year) + ".csv")
+        return df
     urls = []
     if 2018<=year and year<=2022:
         for letter in string.ascii_lowercase:
@@ -68,19 +79,21 @@ def getDataFrame(year: int) -> pd.DataFrame:
         urls = getLinks(year)
     dfs = []
     for url in urls:
-        response = requests.get(url)
+        response = requests.get(url) #Loading in the webstie
         if response.status_code==200:
             html_doc = response.text
         else:
             print(url)
             raise TimeoutError("Web Page doesn't exist")
 
+        #Parsing all the tr elements from the site
         soup = BeautifulSoup(html_doc, 'html.parser')
         elements = soup.find_all('tr')
 
         dict = getSubjectDictionary(year)
         rows = []
 
+        #For each tr element, get the name, school, and subjects
         for element in elements:
             parsed = element.find_all('td')
             
@@ -91,6 +104,7 @@ def getDataFrame(year: int) -> pd.DataFrame:
             name = parsed[0].text
             school = parsed[1].text
 
+            #Account for the different formatting before and after 2015
             if year>=2015:
                 subjects = parsed[2].get_text().split(' - ')
                 subjects.pop(0)
@@ -128,4 +142,6 @@ def generateCSVs():
     while year<=2022:
         getDataFrame(year)
         year+=1
+
+generateCSVs()
 
