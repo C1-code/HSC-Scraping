@@ -6,10 +6,9 @@ import time
 import matplotlib.pyplot as plt
 
 letters = string.ascii_lowercase
-MathsExt1 = {2015: "Mathematics Extension 1", 2001: "Mathematics Extension 1 2 unit "}
-MathsExt2 = {2015: "Mathematics Extension 2", 2001: "Mathematics Extension 2 2 unit "}
 
 def fileExists(path: str)->bool:
+    '''Checks if the file given exists'''
     try:
         f = open(path, "r")
         return True
@@ -17,6 +16,7 @@ def fileExists(path: str)->bool:
         return False
 
 def getLinks(year: int):
+    '''Returns a list containing the urls that the getDataFrame needs to go through for older distinguished achievers lists'''
     url = "https://www.boardofstudies.nsw.edu.au/ebos/static/DSACH_" + str(year) + "_12.html"
     response = requests.get(url)
     if response.status_code==200:
@@ -37,7 +37,8 @@ def getLinks(year: int):
                 linksResult.append("https://www.boardofstudies.nsw.edu.au" + link['href'])
     return linksResult
 
-def getSubjectDictionary(year: int):
+def getSubjectDictionary(year: int)->dict:
+    '''Returns a dictionary mapping NESA course codes to the course name'''
     url = "https://www.boardofstudies.nsw.edu.au/ebos/static/BDHSC_" + str(year) + "_12.html"
     response = requests.get(url)
     if response.status_code==200:
@@ -140,11 +141,15 @@ def getDataFrame(year: int) -> pd.DataFrame:
     print("getDataFrame execution time: " + str(time.time()-t0))
     return maindf
 
-def generateCSVs():
+def generateCSVs()->None:
+    '''If the csv for a specific year doesn't exist, create it. Else retrieve it from local storage'''
     for year in getYears():
         getDataFrame(year)
     
-def getList(year: int, item="School"):
+def getList(year: int, item="School")->list:
+    '''Get either the school or subject list for a specified year'''
+    if item!="School" and item!="Subject":
+        raise ValueError("The item is not a suitable argument")
     df = getDataFrame(year)
     main = []
     for focus in df[str(year) + " " + item]:
@@ -153,40 +158,97 @@ def getList(year: int, item="School"):
     return main
 
 def getYears():
+    '''Get all the years from 2001 to 2022 as a list for iteration'''
     years = []
     year = 2001
     while year<=2022:
         years.append(year)
         year+=1
     return years
+    
+
+def filterSchool(year: int, rawSchool: str)->str:
+    schools = getList(year, item="School")
+    potentialSchools = []
+    for element in schools:
+        if rawSchool.lower() in element.lower():
+            potentialSchools.append(element)
+        elif element.lower() in rawSchool.lower():
+            potentialSchools.append(element)
+    
+    if len(potentialSchools)>1:
+        for element in potentialSchools:
+            if element.lower().startswith(rawSchool.lower())==False:
+                potentialSchools.remove(element)
+
+    if len(potentialSchools)>1:
+        for element in potentialSchools:
+            if len(element)!=len(rawSchool):
+                potentialSchools.remove(element)
+    
+    if len(potentialSchools)>1:
+        raise ValueError("Not specific enough to get one value")      
+
+    return potentialSchools[0]
+
+def filterSubject(year: int, rawSubject: str)->str:
+    subjects = getList(year, item="Subject")
+    potentialSubjects = []
+    split = False
+    if len(rawSubject.split(" "))>1:
+        rawSubjects = rawSubject.split(" ")
+        split = True
+    
+    if split==False:
+        for element in subjects:
+            if rawSubject.lower() in element.lower():
+                potentialSubjects.append(element)
+        
+    elif split==True:
+        for element in subjects:
+            count = 0 
+            for splited in rawSubjects:
+                if splited.lower() in element.lower():
+                    count+=element.lower().count(splited.lower())
+            if count>0:
+                potentialSubjects.append([element, count])
+
+        maxCount = 0
+        for element in potentialSubjects:
+            if element[1]>=maxCount:
+                final = element
+                maxCount = element[1]
+        
+        potentialSubjects = final
+            
+    if len(potentialSubjects)==0 or len(potentialSubjects)>2:
+        print("Not specific enough to get one value")
+        return ""
+    return potentialSubjects[0]
 
 def getSchoolYearSubjectCount(year: int, school: str, subject: str):
+    '''Get the amount of band 6's for school in subject for the year'''
     df = getDataFrame(year)
-    subjectList = getList(year, item="Subject")
 
-    if subject in subjectList:
-        pass
-    else:
-        for element in subjectList:
-            if element.startswith(subject):
-                subject = element
-    print(str(year) + ": " + subject)
+    school = filterSchool(year, school)
+    subject = filterSubject(year, subject)
+    
+    print(str(year) + ", " + school + ", " + subject)
     count =0
     i = 0
     while i<len(df[str(year) + " School"]):
-        if df[str(year) + " School"][i].startswith(school):
-            properSchool = df[str(year) + " School"][i]
+        if df[str(year) + " School"][i]==school:
             if df[str(year) + " Subject"][i]==subject:
                 count+=1
         i+=1
-    return (count, properSchool, subject)
+    return count
 
 def getSchoolRecordSubject(school: str, subject: str):
     scores = []
     for year in getYears():
-        score, properSchool, properSubject = getSchoolYearSubjectCount(year, school, subject)
+        score = getSchoolYearSubjectCount(year, school, subject)
         scores.append(score)
-    return scores, properSchool, properSubject
+    return scores, filterSchool(2022, school), filterSubject(2022, subject)
 
 def graphMultiple():
     school = ""
@@ -205,16 +267,25 @@ def graphMultiple():
         subjects.append(subject)
 
         print("\n")
-    
+            
     fig, ax = plt.subplots(len(schools), 1)
-    for i in range(len(schools)):
-        scores, properSchool, subject = getSchoolRecordSubject(schools[i], subjects[i])
-        
-        ax[i].plot(years, scores)
-        ax[i].set_xlabel("Years")
-        ax[i].set_ylabel("Band 6 count")
-        ax[i].set_title(properSchool + " band 6 count for " + subject)
+    if len(schools)==1:
+        scores, properSchool, subject = getSchoolRecordSubject(schools[0], subjects[0])   
+        ax.scatter(years, scores)
+        ax.set_xlabel("Years")
+        ax.set_ylabel("Band 6 count")
+        ax.set_title(properSchool + " band 6 count for " + subject)
     
-    plt.show()
+        plt.show()
+
+    else:
+        for i in range(len(schools)):
+            scores, properSchool, subject = getSchoolRecordSubject(schools[i], subjects[i])
+            ax[i].scatter(years, scores)
+            ax[i].set_xlabel("Years")
+            ax[i].set_ylabel("Band 6 count")
+            ax[i].set_title(properSchool + " band 6 count for " + subject)
+        
+        plt.show()
 
 graphMultiple()

@@ -16,7 +16,6 @@ def add(request):
     return HttpResponse(template.render({}, request))
 
 def addrecord(request):
-    print(request.POST)
     x = request.POST['first']
     y = request.POST['last']
     member = Members(firstname=x, lastname=y)
