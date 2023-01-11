@@ -1,10 +1,21 @@
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
+import subprocess
+try:
+    import requests
+except ModuleNotFoundError:
+    subprocess.run(["pip","install","requests"])
+
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError:
+    subprocess.run(["pip","install","bs4"])
+
+try:
+    import pandas as pd
+except ModuleNotFoundError:
+    subprocess.run(["pip","install","pandas"])
+
 import string
 import time
-import plotly.express as px
-import plotly
 import os
 import datetime as dt
 
@@ -15,7 +26,11 @@ letters = string.ascii_lowercase
 current_dir = os.path.dirname(__file__)
 pathToCSV = current_dir + "\\data\\"
 
-CURRENT_YEAR = dt.date.today().year
+today = dt.datetime.today()
+if today.month>=12 and today.day>=20:
+    CURRENT_YEAR = today.year
+else:
+    CURRENT_YEAR = today.year-1
 
 def fileExists(path: str)->bool:
     '''Checks if the file given exists'''
@@ -135,11 +150,11 @@ def getDataFrame(year: int) -> pd.DataFrame:
             
             #Name and school is easy to parse, always the first and second element of the table
             name = parsed[0].text
-            school = parsed[1].text
+            school = parsed[1].text.strip()
 
             #Account for the different formatting before and after 2015
             if year>=2015:
-                subjects = parsed[2].get_text().split(' - ')
+                subjects = parsed[2].get_text().strip().split(' - ')
                 subjects.pop(0)
                 i = 0
                 while i<len(subjects)-1:

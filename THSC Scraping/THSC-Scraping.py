@@ -91,30 +91,3 @@ def downloadLinks():
     driver.close()
     
 downloadLinks()
-        
-# from selenium import webdriver
-# from selenium.webdriver.chrome.service import Service as ChromeService
-
-# # Set the path to the ChromeDriver executable
-# chrome_driver_path = "C:\\Users\\elias\\Desktop\\HSC-Scraping\\THSC Scraping\\chromedriver.exe"
-
-# # Create a ChromeService object with the path to the executable
-# service = ChromeService(executable_path=chrome_driver_path)
-
-# # Start the service
-# service.start()
-
-# # Create a new ChromeDriver session
-# driver = webdriver.Chrome(service=service)
-
-# # Navigate to the webpage
-# driver.get("https://thsconline.github.io/s/d/5348/Ascham%202001%20w.%20sol")
-
-# #Pause for the downlaod to take place
-# time.sleep(30)
-
-# # Close the ChromeDriver session
-# driver.close()
-
-# # Stop the service
-# service.stop()
